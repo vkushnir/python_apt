@@ -72,6 +72,7 @@ def get_arguments(args=None):
     
     return parser.parse_args(args)
 
+# TODO: add support for .env file with system options
 
 def get_packages_stream(s):
     """Return a generator that yields packages from a stream."""
