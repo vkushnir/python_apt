@@ -17,34 +17,59 @@ from urllib.parse import urljoin
 import requests
 from colorama import Fore, Style
 
+_version_ = '0.2'
+
 
 def get_arguments(args=None):
     """Get arguments from the command line."""
+    # Argument parser basic configuration
     parser = argparse.ArgumentParser(
-        description='Apt package manager wrapper.')
-    parser.add_argument('-v', '--version', action='store_true',
-                        help='Show version.')
-    params = parser.add_argument_group('Parameters')
-    params.add_argument('-i', '--id', default=get_distro()['id'], help='System ID.')
-    params.add_argument('-t', '--type', default='deb', help='Package type.')
-    params.add_argument('-d', '--distro', default=get_distro()['codename'], help='Distribution code name.')
-    params.add_argument('-c', '--component', default='main', help='Component.')
-    params.add_argument('-a', '--arch', default=platform.machine(), help='Architecture.')
-    params.add_argument('--cache', default='.cache.db', help='Package index cache location.')
-    params.add_argument('--sources', default='sources.list', help='Sources list location.')
-    params.add_argument('--repo', help='Repository location.')
-    params.add_argument('--dir', default='.', help='Download directory.')
-    parser.add_argument('-p', '--package', dest='packages', action='append', help='Package name.')
-    parser.add_argument('-f', '--file', dest='files', action='append', help='Files name.')
-    actions = parser.add_argument_group('Actions')
-    actions.add_argument('--update', action='store_true',
-                         help='Update the package index.')
-    actions.add_argument('--info', action='store_true',
-                         help='Show package information.')
-    actions.add_argument('--deps', action='store_true',
-                         help='Get dependencies.')
-    actions.add_argument('--download', action='store_true',
-                         help='Download packages.')
+        description='Apt package downloader.', epilog='Example: apt.py -p vim -p nano --info --deps')
+    parser.add_argument('--version', action='version', version=f'%(prog)s {_version_}')
+    
+    # Argument parser groups
+    sys_options = parser.add_argument_group(title='system options',
+                                            description='Properties of the system for which packages will be chosen.')
+    apt_actions = parser.add_argument_group(title='apt actions',
+                                            description='Actions to be performed with the selected options.')
+    p_parameters = parser.add_argument_group(title='package parameters',
+                                             description='Packages or file names to search/download.')
+    
+    # Argument parser basic options
+    parser.add_argument('--cache', dest='apt_cache', default='.cache.db',
+                        help='Package index cache file path.')
+    parser.add_argument('--sources', dest='apt_sources', default='sources.list',
+                        help='Apt "sources.list" file path.')
+    parser.add_argument('--repo', dest='apt_url',
+                        help='Repository url.')
+    parser.add_argument('--dir', dest='apt_download', default='.',
+                        help='Download directory.')
+    # Argument parser system options
+    sys_options.add_argument('-i', '--id', dest='sys_id', default=get_distro()['id'],
+                             help='System ID. (eg. ubuntu, debian)')
+    sys_options.add_argument('-t', '--type', default='deb',
+                             help='Package type. (eg. deb, deb-src)')
+    sys_options.add_argument('-d', '--distro', default=get_distro()['codename'],
+                             help='Distribution code name. (eg. focal, buster)')
+    sys_options.add_argument('-c', '--component', default='main',
+                             help='Component. (eg. main, universe)')
+    sys_options.add_argument('-a', '--arch', default=platform.machine(),
+                             help='Platform architecture. (eg. amd64, arm64)')
+    # Argument parser apt actions
+    apt_actions.add_argument('--update', dest='update', action='store_true',
+                             help='Update the package index cache.')
+    apt_actions.add_argument('--info', dest='info', action='store_true',
+                             help='Show package information about specified packages.')
+    apt_actions.add_argument('--deps', dest='dependencies', action='store_true',
+                             help='Download with dependencies.')
+    apt_actions.add_argument('--download', dest='download', action='store_true',
+                             help='Download specified packages.')
+    # Argument parser package parameters
+    p_parameters.add_argument('-p', '--package', dest='packages', action='append',
+                              help='Package names.')
+    p_parameters.add_argument('-f', '--file', dest='files', action='append',
+                              help='File names.')
+    
     return parser.parse_args(args)
 
 
@@ -409,6 +434,7 @@ def main(opts):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+    """Main entry point."""
     logging.basicConfig(level=logging.WARNING)
     opts = get_arguments()
     main(opts)
