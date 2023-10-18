@@ -40,27 +40,27 @@ def get_arguments(args=None):
                         help='Package index cache file path.')
     parser.add_argument('--sources', dest='apt_sources', default='sources.list',
                         help='Apt "sources.list" file path.')
-    parser.add_argument('--repo', dest='apt_url',
+    parser.add_argument('--repo', dest='apt_repo',
                         help='Repository url.')
     parser.add_argument('--dir', dest='apt_download', default='.',
                         help='Download directory.')
     # Argument parser system options
     sys_options.add_argument('-i', '--id', dest='sys_id', default=get_distro()['id'],
                              help='System ID. (eg. ubuntu, debian)')
-    sys_options.add_argument('-t', '--type', default='deb',
+    sys_options.add_argument('-t', '--type', dest='sys_type', default='deb',
                              help='Package type. (eg. deb, deb-src)')
-    sys_options.add_argument('-d', '--distro', default=get_distro()['codename'],
+    sys_options.add_argument('-d', '--distro', dest='sys_distro', default=get_distro()['codename'],
                              help='Distribution code name. (eg. focal, buster)')
-    sys_options.add_argument('-c', '--component', default='main',
+    sys_options.add_argument('-c', '--comp', dest='sys_component', default='main',
                              help='Component. (eg. main, universe)')
-    sys_options.add_argument('-a', '--arch', default=platform.machine(),
+    sys_options.add_argument('-a', '--arch', dest='sys_arch', default=platform.machine(),
                              help='Platform architecture. (eg. amd64, arm64)')
     # Argument parser apt actions
     apt_actions.add_argument('--update', dest='update', action='store_true',
                              help='Update the package index cache.')
-    apt_actions.add_argument('--info', dest='info', action='store_true',
+    apt_actions.add_argument('--info', dest='get_info', action='store_true',
                              help='Show package information about specified packages.')
-    apt_actions.add_argument('--deps', dest='dependencies', action='store_true',
+    apt_actions.add_argument('--deps', dest='with_dependencies', action='store_true',
                              help='Download with dependencies.')
     apt_actions.add_argument('--download', dest='download', action='store_true',
                              help='Download specified packages.')
@@ -132,17 +132,18 @@ def get_repo_url(opts):
     """Get the repository url.
     :type opts: dict The options.
     """
-    if opts.repo:
-        return opts.repo
+    if opts.apt_repo:
+        return opts.apt_repo
     else:
-        with (open(opts.sources, 'r') as f):
+        with (open(opts.apt_sources, 'r') as f):
             lines = f.readlines()
             for line in lines:
-                if line.startswith(f'{opts.type} '):
+                if line.startswith(f'{opts.sys_type} '):
                     components = line.rstrip().split(' ')
                     if len(components) < 4:
                         continue
-                    if components[2].upper() == opts.distro.upper() and components[3].upper() == opts.component.upper():
+                    if components[2].upper() == opts.sys_distro.upper() \
+                            and components[3].upper() == opts.sys_component.upper():
                         return components[1]
         logging.error('Cannot find repository url.')
         sys.exit(1)
@@ -154,10 +155,10 @@ def get_repos(opts):
     :rtype: list of objects The list of repositories.
     """
     repos = []
-    with (open(opts.sources, 'r') as f):
+    with (open(opts.apt_sources, 'r') as f):
         lines = f.readlines()
         for line in lines:
-            if line.startswith(f'{opts.type} '):
+            if line.startswith(f'{opts.sys_type} '):
                 components = line.rstrip().split(' ')
                 if len(components) < 4:
                     continue
@@ -166,20 +167,20 @@ def get_repos(opts):
                     url=components[1],
                     distro=components[2],
                     component=components[3]))
-    if opts.repo:
+    if opts.apt_repo:
         repos.append(dict(
-            type=opts.type,
-            url=opts.repo,
-            distro=opts.distro,
-            component=opts.component))
+            type=opts.sys_type,
+            url=opts.apt_repo,
+            distro=opts.sys_distro,
+            component=opts.sys_component))
     return repos
 
 
 def get_connection(opts):
-    """Get the database connection.
-    :type opts: dict The options.
+    """Get the database connection. (create all tables if not exists)
+    :type opts: Namespace() The options.
     """
-    conn = sqlite3.connect(opts.cache)
+    conn = sqlite3.connect(opts.apt_cache)
     cur = conn.cursor()
     # Repo table format: id, os, type, distro, component, url
     cur.execute('CREATE TABLE IF NOT EXISTS repos ('
@@ -228,7 +229,8 @@ def download_file(url, filename=None):
     """
     if filename:
         print(
-            f'{Style.DIM}Downloading{Style.NORMAL} {Fore.GREEN}{url}{Fore.RESET} {Style.DIM}to{Style.NORMAL} {Fore.CYAN}{filename} {Style.DIM}...{Style.RESET_ALL}')
+            f'{Style.DIM}Downloading{Style.NORMAL} {Fore.GREEN}{url}{Fore.RESET} '
+            f'{Style.DIM}to{Style.NORMAL} {Fore.CYAN}{filename} {Style.DIM}...{Style.RESET_ALL}')
         r = requests.get(url, allow_redirects=True)
         open(filename, 'wb').write(r.content)
         return filename
@@ -255,13 +257,13 @@ def update_cache(opts, repos, conn):
     for repo in repos:
         # add repo to the database if it doesn't exist and get the id
         cur.execute('INSERT OR IGNORE INTO repos (os, type, distro, component, url) values (?, ?, ?, ?, ?)',
-                    (opts.id, repo['type'], repo['distro'], repo['component'], repo['url']))
+                    (opts.sys_id, repo['type'], repo['distro'], repo['component'], repo['url']))
         cur.execute('SELECT id FROM repos WHERE os=? AND type=? AND distro=? AND component=? AND url=?',
-                    (opts.id, repo['type'], repo['distro'], repo['component'], repo['url']))
+                    (opts.sys_id, repo['type'], repo['distro'], repo['component'], repo['url']))
         repo_id = cur.fetchone()[0]
         logging.info(f'Updating {repo["url"]}, {repo["distro"]}, {repo["component"]}')
         # download the package index
-        index = download_file(get_package_index_url(repo['url'], repo['distro'], repo['component'], opts.arch))
+        index = download_file(get_package_index_url(repo['url'], repo['distro'], repo['component'], opts.sys_arch))
         if index is None:
             continue
         packages = get_packages_stream(index)
@@ -274,13 +276,13 @@ def update_cache(opts, repos, conn):
                          package.get('Description', None), package.get('Section', None),
                          package.get('Priority', None), package.get('Size', None)))
         # download the contents index
-        contents = download_file(get_package_content_url(repo['url'], repo['distro'], repo['component'], opts.arch))
+        contents = download_file(get_package_content_url(repo['url'], repo['distro'], repo['component'], opts.sys_arch))
         if contents is None:
             continue
         for line in contents.splitlines():
             fl = line.split()
             cur.execute('INSERT OR IGNORE INTO contents (repo_id, file, location, arch) values (?, ?, ?, ?)',
-                        (repo_id, fl[0], fl[1], opts.arch))
+                        (repo_id, fl[0], fl[1], opts.sys_arch))
     conn.commit()
     cur.close()
 
@@ -288,7 +290,7 @@ def update_cache(opts, repos, conn):
 def get_dependencies(opts, conn, dependencies):
     """Get package dependencies."""
     depends_re = re.compile(
-        r'^(?P<package>[a-zA-Z0-9\-\+\.]+)(?:\s+\((?P<condition>[>=<~]+)?\s+(?P<version>[0-9a-z\.\:\-\+\~]+)\))?')
+        r'^(?P<package>[a-zA-Z0-9\-+.]+)(?:\s+\((?P<condition>[>=<~]+)?\s+(?P<version>[0-9a-z.:\-+~]+)\))?')
     logging.debug(f'Getting dependencies packages {dependencies}')
     depends = [depends_re.search(depend.strip(), 0).groupdict() for depend in dependencies.split(',')]
     deps_packages = get_packages(opts, conn, [depend['package'] for depend in depends])
@@ -309,7 +311,12 @@ def get_packages(opts, conn, packages, like=False):
                         'WHERE r.id=p.repo_id '
                         'AND r.os=? AND r.type=? AND r.distro=? AND r.component=? AND p.arch=? '
                         'AND p.package LIKE ?',
-                        (opts.id, opts.type, opts.distro, opts.component, opts.arch, f'%{package}%'))
+                        (opts.sys_id,
+                         opts.sys_type,
+                         opts.sys_distro,
+                         opts.sys_component,
+                         opts.sys_arch,
+                         f'%{package}%'))
         else:
             cur.execute('SELECT p.package, p.version, p.filename, p.arch, p.depends, p.section, p.description, '
                         'r.type, r.distro, r.component, r.url '
@@ -317,7 +324,11 @@ def get_packages(opts, conn, packages, like=False):
                         'WHERE r.id=p.repo_id '
                         'AND r.os=? AND r.type=? AND r.distro=? AND r.component=? AND p.arch=? '
                         'AND p.package=?',
-                        (opts.id, opts.type, opts.distro, opts.component, opts.arch, package))
+                        (opts.sys_id,
+                         opts.sys_type,
+                         opts.sys_distro,
+                         opts.sys_component,
+                         opts.sys_arch, package))
         rows = cur.fetchall()
         for row in rows:
             data = {}
@@ -339,14 +350,15 @@ def search_files(opts, conn):
     for file in opts.files:
         cur.execute('SELECT c.file, c.location FROM contents c '
                     'WHERE c.arch=? AND c.file LIKE ?',
-                    (opts.arch, f'%{file}%'))
+                    (opts.sys_arch, f'%{file}%'))
         rows = cur.fetchall()
         print(f'\n{Style.BRIGHT}{Fore.YELLOW}Found {len(rows)} files for "{file}".{Fore.RESET}{Style.NORMAL}')
         for row in rows:
             data = {}
             [data.update({k: v}) for k, v in zip([d[0] for d in cur.description], row)]
             print(
-                f'{Style.DIM}File:{Style.NORMAL} {Fore.GREEN}{data["file"]}{Fore.RESET}{Style.DIM}, Package: {Style.RESET_ALL}{Fore.YELLOW}{data["location"]}{Fore.RESET}')
+                f'{Style.DIM}File:{Style.NORMAL} {Fore.GREEN}{data["file"]}{Fore.RESET}{Style.DIM}, '
+                f'Package: {Style.RESET_ALL}{Fore.YELLOW}{data["location"]}{Fore.RESET}')
     cur.close()
 
 
@@ -367,7 +379,7 @@ def show_package_info(opts, conn):
         print(f'\nPackage: {Fore.GREEN}{Style.BRIGHT}{package["package"]}{Fore.RESET}:')
         [print(f'  {Style.DIM}{k}:{Style.NORMAL} {Fore.YELLOW}{v}{Style.RESET_ALL}')
          for k, v in package.items() if k not in ['package', 'type', 'distro', 'component', 'url']]
-        if opts.deps and len(package['depends']) > 0:
+        if opts.with_dependencies and len(package['depends']) > 0:
             dependencies = get_dependencies(opts, conn, package['depends'])
             print(f'    {Style.DIM}From {Style.NORMAL}{len(package["depends"].split(","))}{Style.DIM} dependencies, '
                   f'found {Style.NORMAL}{len(dependencies)}{Style.RESET_ALL}')
@@ -381,9 +393,9 @@ def download(opts, conn):
     packages = get_packages(opts, conn, opts.packages)
     print(f'\n{Style.BRIGHT}{Fore.YELLOW}Download {len(packages)} packages.{Fore.RESET}{Style.NORMAL}')
     [download_file(urljoin(package['url'], package['filename']),
-                   os.path.join(opts.dir, os.path.basename(package['filename'])))
+                   os.path.join(opts.apt_download, os.path.basename(package['filename'])))
      for package in packages.values()]
-    if opts.deps:
+    if opts.with_dependencies:
         # download dependencies
         dependencies = {}
         [dependencies.update({dpackage['package']: dpackage})
@@ -392,25 +404,30 @@ def download(opts, conn):
         dependencies = {k: v for k, v in dependencies.items() if k not in packages.keys()}
         print(f'\n{Style.BRIGHT}{Fore.YELLOW}Download {len(dependencies)} dependencies.{Fore.RESET}{Style.NORMAL}')
         [download_file(urljoin(dependency['url'], dependency['filename']),
-                       os.path.join(opts.dir, os.path.basename(dependency['filename'])))
+                       os.path.join(opts.apt_download, os.path.basename(dependency['filename'])))
          for dependency in dependencies.values()]
 
 
 def main(opts):
     """Main function."""
+    # Print current system settings
     print(f"{Style.BRIGHT}Current settings{Style.NORMAL}:\n"
-          f"        id: {Style.BRIGHT}{opts.id}{Style.NORMAL}\n"
-          f"      type: {Style.BRIGHT}{opts.type}{Style.NORMAL}\n"
-          f"    distro: {Style.BRIGHT}{opts.distro}{Style.NORMAL}\n"
-          f" component: {Style.BRIGHT}{opts.component}{Style.NORMAL}\n"
-          f"      arch: {Style.BRIGHT}{opts.arch}{Style.NORMAL}\n"
-          f"==================\n")
-    if opts.id == '*' or opts.type == '*' or opts.distro == '*' or opts.component == '*' or opts.arch == '*':
+          f"        id: {Style.BRIGHT}{opts.sys_id}{Style.NORMAL}\n"
+          f"      type: {Style.BRIGHT}{opts.sys_type}{Style.NORMAL}\n"
+          f"    distro: {Style.BRIGHT}{opts.sys_distro}{Style.NORMAL}\n"
+          f" component: {Style.BRIGHT}{opts.sys_component}{Style.NORMAL}\n"
+          f"      arch: {Style.BRIGHT}{opts.sys_arch}{Style.NORMAL}\n"
+          f"==================")
+    # Check system if all system parameters are set
+    if (
+            opts.sys_id == '*' or
+            opts.sys_type == '*' or
+            opts.sys_distro == '*' or
+            opts.sys_component == '*' or
+            opts.sys_arch == '*'):
         logging.error('Invalid system parameters.')
         sys.exit(1)
-    if opts.version:
-        print('apt.py version 0.1')
-        sys.exit(0)
+    # Proceed with the selected options
     conn = get_connection(opts)
     try:
         if opts.update:
@@ -421,7 +438,7 @@ def main(opts):
             if opts.files:
                 search_files(opts, conn)
             if opts.packages:
-                if opts.info:
+                if opts.get_info:
                     show_package_info(opts, conn)
                 else:
                     show_packages(opts, conn)
