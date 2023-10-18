@@ -3,7 +3,7 @@
   <component name="Black">
     <option name="executionMode" value="BINARY" />
     <option name="pathToExecutable" value="/opt/homebrew/bin/black" />
-    <option name="sdkUUID" value="5ad9c25c-0d55-4d5c-ba6b-5ca2d6b0a5dd" />
+    <option name="sdkName" value="Python 3.10" />
   </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.10" project-jdk-type="Python SDK" />
 </project>
