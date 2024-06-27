@@ -75,6 +75,7 @@ def get_arguments(args=None):
 
 # TODO: add support for .env file with system options
 # TODO: add more system detection methods
+# TODO: add option for reuirments level (насколько уровней вглубь зависимостей зависимостей выкачивать)
 
 
 def get_packages_stream(s):
