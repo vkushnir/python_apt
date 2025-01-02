@@ -1,0 +1,3 @@
+# Zabbix 7.0 bookworm
+deb https://repo.zabbix.com/zabbix/7.0/debian bookworm main
+deb-src https://repo.zabbix.com/zabbix/7.0/debian bookworm main

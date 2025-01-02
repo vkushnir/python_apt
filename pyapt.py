@@ -5,6 +5,7 @@
 import argparse
 import configparser
 import gzip
+import lzma
 import logging
 import os
 import platform
@@ -75,7 +76,8 @@ def get_arguments(args=None):
 
 # TODO: add support for .env file with system options
 # TODO: add more system detection methods
-# TODO: add option for reuirments level (насколько уровней вглубь зависимостей зависимостей выкачивать)
+# TODO: add option for requirements level (насколько уровней вглубь зависимостей зависимостей выкачивать)
+# TODO: add package version option
 
 
 def get_packages_stream(s):
@@ -119,7 +121,8 @@ def get_package_index_url(url, distro, component, arch):
     :type arch: str The architecture.
     dists/$DIST/$COMP/binary-$ARCH/Packages.gz
     """
-    return urljoin(url, posixpath.join('dists', distro, component, f'binary-{arch}', 'Packages.gz'))
+    fn = 'Packages.xz' if distro.lower().find('security') > 0 else 'Packages.gz'
+    return urljoin(url, posixpath.join('dists', distro, component, f'binary-{arch}', fn))
 
 
 def get_package_content_url(url, distro, component, arch):
@@ -130,7 +133,8 @@ def get_package_content_url(url, distro, component, arch):
     :type arch: str The architecture.
     dists/$DIST/$COMP/Contents-$SARCH.gz
     """
-    return urljoin(url, posixpath.join('dists', distro, component, f'Contents-{arch}.gz'))
+    fn = f'Contents-{arch}.xz' if distro.lower().find('security') > 0 else f'Contents-{arch}.gz'
+    return urljoin(url, posixpath.join('dists', distro, component, fn))
 
 
 def get_repo_url(opts):
@@ -248,6 +252,8 @@ def download_file(url, filename=None):
         # check if the content is compressed
         if response.content[:2] == b'\x1f\x8b':
             return gzip.decompress(response.content).decode('utf-8')
+        elif response.content[:2] == b'\xfd\x37':
+            return lzma.decompress(response.content).decode('utf-8')
         else:
             return response.content.decode('utf-8')
 
