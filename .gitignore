@@ -160,7 +160,12 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-*.deb
-*.db
+# macOS temporary files
+*.DS_Store
 
+# Debian packaging
+*.deb
+
+# Other
+*.db
 stuff/
