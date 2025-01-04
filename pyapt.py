@@ -7,7 +7,6 @@ import gzip
 import logging
 import lzma
 import os
-import platform
 import posixpath
 import re
 import sqlite3
@@ -49,13 +48,13 @@ def get_arguments(args=None):
     # Argument parser system options
     sys_options.add_argument('-i', '--id', dest='sys_id',
                              help='System ID. (eg. ubuntu, debian)')
-    sys_options.add_argument('-t', '--type', dest='sys_type', default='deb',
+    sys_options.add_argument('-t', '--type', dest='sys_type',
                              help='Package type. (eg. deb, deb-src)')
     sys_options.add_argument('-d', '--distro', dest='sys_distro',
-                             help='Distribution code name. (eg. focal, buster)')
-    sys_options.add_argument('-c', '--comp', dest='sys_component', default='main',
+                             help='Distribution code name. (eg. focal, buster, jammy)')
+    sys_options.add_argument('-c', '--comp', dest='sys_component',
                              help='Component. (eg. main, universe)')
-    sys_options.add_argument('-a', '--arch', dest='sys_arch', default=platform.machine(),
+    sys_options.add_argument('-a', '--arch', dest='sys_arch',
                              help='Platform architecture. (eg. amd64, arm64)')
     # Argument parser apt actions
     apt_actions.add_argument('--update', dest='update', action='store_true',
@@ -454,4 +453,13 @@ if __name__ == '__main__':
     """Main entry point."""
     logging.basicConfig(level=logging.WARNING)
     opts = get_arguments()
+    for arg, cfg in dict(
+            sys_id="APT::ID",
+            sys_distro="APT::Distro",
+            sys_arch="APT::Architecture",
+            sys_type="APT::PackageType",
+            sys_component="APT::Component").items():
+        val = getattr(opts, arg)
+        if val is not None:
+            config.set(cfg, val)
     main(opts)
