@@ -21,9 +21,10 @@
 #   #####################################################################
 
 import os
+from .platformutil import _platform_info as platform
+from .singleton import Singleton
 
-
-class Configuration:
+class Configuration(Singleton):
     """
     Configuration class
     """
@@ -103,6 +104,13 @@ if os.path.isdir(os.path.join(os.path.curdir, 'etc')):
     _config.set("Dir", os.path.curdir)
 else:
     _config.set("Dir", "/")
+# Set current system parameters
+_config.set("APT::ID", platform.id)
+_config.set("APT::Platform", platform.os)
+_config.set("APT::Distro", platform.distro)
+_config.set("APT::Architecture", platform.arch)
+_config.set("APT::PackageType", "deb")
+_config.set("APT::Component", "main")
 # State
 _config.set_many({
     "Dir::State": "var/lib/apt/",
@@ -150,4 +158,13 @@ _config.set_many({
     "Acquire::IndexTargets::deb-src::Sources::Description": "$(RELEASE)/$(COMPONENT) Sources",
     "Acquire::IndexTargets::deb-src::Sources::flatDescription": "$(RELEASE) Sources",
     "Acquire::IndexTargets::deb-src::Sources::Optional": False
+})
+# Compression types
+_config.set_many({
+    "Acquire::CompressionTypes::xz": "xz",
+    "Acquire::CompressionTypes::bz2": "bzip2",
+    "Acquire::CompressionTypes::lzma": "lzma",
+    "Acquire::CompressionTypes::gz": "gzip",
+    "Acquire::CompressionTypes::lz4": "lz4",
+    "Acquire::CompressionTypes::zst": "zstd"
 })
