@@ -1,12 +1,11 @@
-#!/usr/bin/env python3.11
+#!/usr/bin/env python3.10
 
 # https://wiki.debian.org/DebianRepository/Format
 
 import argparse
-import configparser
 import gzip
-import lzma
 import logging
+import lzma
 import os
 import platform
 import posixpath
@@ -17,6 +16,8 @@ from urllib.parse import urljoin
 
 import requests
 from colorama import Fore, Style
+
+from pyapt import _config as config
 
 _version_ = '0.2'
 
@@ -46,11 +47,11 @@ def get_arguments(args=None):
     parser.add_argument('--dir', dest='apt_download', default='.',
                         help='Download directory.')
     # Argument parser system options
-    sys_options.add_argument('-i', '--id', dest='sys_id', default=get_distro()['id'],
+    sys_options.add_argument('-i', '--id', dest='sys_id',
                              help='System ID. (eg. ubuntu, debian)')
     sys_options.add_argument('-t', '--type', dest='sys_type', default='deb',
                              help='Package type. (eg. deb, deb-src)')
-    sys_options.add_argument('-d', '--distro', dest='sys_distro', default=get_distro()['codename'],
+    sys_options.add_argument('-d', '--distro', dest='sys_distro',
                              help='Distribution code name. (eg. focal, buster)')
     sys_options.add_argument('-c', '--comp', dest='sys_component', default='main',
                              help='Component. (eg. main, universe)')
@@ -96,21 +97,6 @@ def get_packages_stream(s):
             package[key.strip()] = value.strip()
             previous_key = key
     yield package
-
-
-def get_distro():
-    """Get the distribution code name."""
-    if platform.system() == 'Linux':
-        if os.path.isfile('/etc/os-release'):
-            config = configparser.ConfigParser()
-            config.read('/etc/os-release')
-            return dict(id=config['ID'],
-                        name=config['NAME'],
-                        version=config['VERSION_ID'],
-                        codename=config['VERSION_CODENAME'])
-    else:
-        logging.warning('Unsupported operating system.')
-        return dict(id='*', name='*', version='*', codename='*')
 
 
 def get_package_index_url(url, distro, component, arch):
@@ -422,13 +408,16 @@ def download(opts, conn):
 def main(opts):
     """Main function."""
     # Print current system settings
-    print(f"{Style.BRIGHT}Current settings{Style.NORMAL}:\n"
-          f"        id: {Style.BRIGHT}{opts.sys_id}{Style.NORMAL}\n"
-          f"      type: {Style.BRIGHT}{opts.sys_type}{Style.NORMAL}\n"
-          f"    distro: {Style.BRIGHT}{opts.sys_distro}{Style.NORMAL}\n"
-          f" component: {Style.BRIGHT}{opts.sys_component}{Style.NORMAL}\n"
-          f"      arch: {Style.BRIGHT}{opts.sys_arch}{Style.NORMAL}\n"
-          f"==================")
+    print("==================")
+    print(f"{Style.BRIGHT}Current settings{Style.NORMAL}:")
+    for name, cfg in dict(id="APT::ID",
+                          platform="APT::Platform",
+                          distro="APT::Distro",
+                          arch="APT::Architecture",
+                          type="APT::PackageType",
+                          component="APT::Component").items():
+        print(f"{name:>10}: {Style.BRIGHT}{config.get(cfg)}{Style.NORMAL}")
+    print("==================")
     # Check system if all system parameters are set
     if (
             opts.sys_id == '*' or

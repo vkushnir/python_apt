@@ -1,2 +1,1 @@
-from .contrib import _config
-from .contrib import uri_to_file_name
+from .contrib import _config, _platform_info

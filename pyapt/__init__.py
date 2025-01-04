@@ -1,3 +1,3 @@
-from .pkg import _config
+from .pkg import _config, _platform_info
 
-__all__ = ["_config"]
+__all__ = ["_config", "_platform_info"]
