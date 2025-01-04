@@ -408,16 +408,16 @@ def download(opts, conn):
 def main(opts):
     """Main function."""
     # Print current system settings
-    print("==================")
-    print(f"{Style.BRIGHT}Current settings{Style.NORMAL}:")
-    for name, cfg in dict(id="APT::ID",
-                          platform="APT::Platform",
+    print("=".rjust(21, "="))
+    print(f"{Style.BRIGHT}Current APT settings{Style.NORMAL}:")
+    for name, cfg in dict(platform="APT::Platform",
+                          id="APT::ID",
                           distro="APT::Distro",
                           arch="APT::Architecture",
                           type="APT::PackageType",
                           component="APT::Component").items():
         print(f"{name:>10}: {Style.BRIGHT}{config.get(cfg)}{Style.NORMAL}")
-    print("==================")
+    print("=".rjust(21, "="))
     # Check system if all system parameters are set
     if (
             opts.sys_id == '*' or
