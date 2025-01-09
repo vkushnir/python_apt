@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 import requests
 from colorama import Fore, Style
 
-from pyapt import _config as config
+from pyapt import _config as config, _sources as sources
 
 _version_ = '0.2'
 
@@ -430,7 +430,8 @@ def main(opts):
     conn = get_connection(opts)
     try:
         if opts.update:
-            update(opts, conn)
+            # update(opts, conn)
+            sources.read_main_list()
         if opts.download:
             download(opts, conn)
         else:
